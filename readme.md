@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/rubenszimbres-a2a-adk-mcp-badge.png)](https://mseep.ai/app/rubenszimbres-a2a-adk-mcp)
+
 # Agent-to-Agent (A2A) Security Pipeline with MCP Integration
 
 This project implements a security-focused data processing pipeline using the Agent-to-Agent (A2A) protocol combined with Model Context Protocol (MCP) integration. The system provides secure database queries through a multi-agent architecture.
