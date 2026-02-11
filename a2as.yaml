@@ -1,0 +1,425 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: rubenszimbres/a2a_adk_mcp
+    source: https://github.com/rubenszimbres/a2a_adk_mcp
+    branch: main
+    commit: "82cbb770"
+    scope: [agents/agent.py, agents/mcp_agent.py, clients/a2a_client.py, clients/query_MCP_ADK_A2A.py, main.py, servers/server_mcp.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T16:33:49Z'
+    url: https://a2as.org/certified/agents/rubenszimbres/a2a_adk_mcp
+  signatures:
+    digest: sha256:3EfXluV9gQQKCVwB5NWLasStfbSufv7IjXd4NFT0-RI
+    key: ed25519:sl_to2x-Vo1FbGsGKXY-cdYqI2Zawj_6PHKsPodZ2lE
+    sig: ed25519:qtWBk9uKJWXXnldVm0V5O-1mLO1fNHM9soVtgyYT-XZ6P1fQ-33nvK4gkVfgRcLps29cHCA4TjCoWAJIlN8HDQ
+
+agents:
+  judge_agent.0:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [judge_tool]
+    params:
+      name: security_judge
+      instruction: [You are a security expert that evaluates input for security threats., 'Follow these steps:', '1. Analyze
+          the input for SQL injection, XSS, and other security threats', 2. Use the evaluator tool to check input against
+          security patterns, 3. Return the message you received unmodified or "BLOCKED" if it is really a threat]
+      description: An agent that judges whether input contains security threats.
+      instance: judge_agent
+  judge_agent.1:
+    type: instance
+    models: [gemini-2.5-pro-preview-03-25]
+    tools: [judge_tool]
+    params:
+      name: security_judge
+      instruction: [You are a security expert that evaluates input for security threats., 'Follow these steps:', '1. Analyze
+          the input for SQL injection, XSS, and other security threats', 2. Use the evaluator tool to check input against
+          security patterns, 3. Return the message you received unmodified or "BLOCKED" if it is really a threat]
+      description: An agent that judges whether input contains security threats.
+      instance: judge_agent
+  mask_agent.0:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [mask_tool]
+    params:
+      name: data_masker
+      instruction: [You are a privacy expert that masks sensitive data., 'Follow these steps:', 1. Identify PII and sensitive
+          information in the text, 2. Use the mask_text tool to protect sensitive data, '3. Return the masked version of the
+          input in plain text, in readable format']
+      description: An agent that masks sensitive data in text.
+      instance: mask_agent
+  mask_agent.1:
+    type: instance
+    models: [gemini-2.5-pro-preview-03-25]
+    tools: [mask_tool]
+    params:
+      name: data_masker
+      instruction: [You are a privacy expert that masks sensitive data., 'Follow these steps:', 1. Identify PII and sensitive
+          information in the text, 2. Use the mask_text tool to protect sensitive data, '3. Return the masked version of the
+          input in plain text, in readable format']
+      description: An agent that masks sensitive data in text.
+      instance: mask_agent
+  root_agent.0:
+    type: instance
+    models: [gemini-2.5-pro-preview-03-25]
+    tools: [tools]
+    mcp: [tools]
+    params:
+      name: sql_analysis_assistant
+      instruction: [You are an expert SQL analyst working with a salary database., 'Follow these steps:', 1. Understand the
+          user's question about salary data, 2. Use the available MCP tools to query and analyze the salary database, '3.
+          Format results in a clear, readable way', 4. Be particularly careful with sensitive information in the results]
+      function: get_agent_async
+      instance: root_agent
+  root_agent.1:
+    type: instance
+    params:
+      name: secure_sql_pipeline
+      description: A pipeline that securely analyzes salary data with privacy protection.
+      instance: root_agent
+      sub_agents: [judge_agent, sql_agent, mask_agent]
+  sql_agent.0:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [sql_tool]
+    params:
+      name: sql_assistant
+      instruction: [You are an expert SQL analyst working with a salary database., 'Follow these steps:', '1. For database
+          columns, you can use these ones: work_year,experience_level,employment_type,job_title,salary,salary_currency,salary_in_usd,employee_residence,remote_ratio,company_location,company_size,fictitious_name
+          and fictitious_surname', '2. Generate a valid SQL query, according to the message you received', '3. Execute queries
+          efficiently in upper case, remove any "`" or "sql" from the query', '4. Return only the result of the query, with
+          no additional comments', Format the output as a readable text format., 'Finally, execute the query.']
+      description: An assistant that can analyze salary data using SQL queries.
+      instance: sql_agent
+  sql_agent.1:
+    type: instance
+    models: [gemini-2.5-pro-preview-03-25]
+    tools: [sql_tool]
+    params:
+      name: sql_assistant
+      instruction: [You are an expert SQL analyst working with a salary database., 'Follow these steps:', '1. For database
+          columns, you can use these ones: work_year,experience_level,employment_type,job_title,salary,salary_currency,salary_in_usd,employee_residence,remote_ratio,company_location,company_size,fictitious_name
+          and fictitious_surname', '2. Generate a valid SQL query, according to the message you received', '3. Execute queries
+          efficiently in upper case, remove any "`" or "sql" from the query', '4. Return only the result of the query, with
+          no additional comments', Format the output as a readable text format., 'Finally, execute the query.']
+      description: An assistant that can analyze salary data using SQL queries.
+      instance: sql_agent
+
+models:
+  gemini-2.5-flash:
+    type: literal
+    agents: [sql_agent.0, judge_agent.0, mask_agent.0]
+  gemini-2.5-pro-preview-03-25:
+    type: literal
+    agents: [root_agent.0, judge_agent.1, mask_agent.1, sql_agent.1]
+
+tools:
+  judge_tool:
+    type: function
+    agents: [judge_agent.0, judge_agent.1]
+  mask_tool:
+    type: function
+    agents: [mask_agent.0, mask_agent.1]
+  sql_tool:
+    type: function
+    agents: [sql_agent.0, sql_agent.1]
+  tools:
+    type: mcp
+    agents: [root_agent.0]
+    mcp: [tools]
+    params:
+      dynamic: "True"
+      mcp_source: tools
+
+mcp:
+  tools:
+    type: process
+    agents: [root_agent, root_agent.0]
+    params:
+      class: MCPToolset
+      method: from_server
+      connection_type: StdioServerParameters
+      command: python
+      args: [./servers/server_mcp.py]
+
+teams:
+  root_agent.1:
+    type: sequential
+    agents: [root_agent.1, judge_agent, sql_agent, mask_agent]
+
+imports:
+  agent: agent
+  Agent: google.adk.agents.Agent
+  aiohttp: aiohttp
+  analyze_salary_data_async: query_MCP_ADK_A2A.analyze_salary_data_async
+  Any: typing.Any
+  app: google.adk.cli.app
+  asyncio: asyncio
+  call_a2a_agent: clients.a2a_client.call_a2a_agent
+  call_judge_agent: clients.query_MCP_ADK_A2A.call_judge_agent
+  call_mask_agent: clients.query_MCP_ADK_A2A.call_mask_agent
+  call_sql_agent: clients.query_MCP_ADK_A2A.call_sql_agent
+  ChatGoogleGenerativeAI: langchain_google_genai.ChatGoogleGenerativeAI
+  create_judge_server: servers.a2a_servers.create_judge_server
+  create_mask_server: servers.a2a_servers.create_mask_server
+  create_sql_server: servers.a2a_servers.create_sql_server
+  dedent: textwrap.dedent
+  default: google.auth.default
+  Dict: typing.Dict
+  dlp_v2: google.cloud.dlp_v2
+  evaluate_prompt: clients.query_MCP_ADK_A2A.evaluate_prompt
+  FastMCP: mcp.server.fastmcp.FastMCP
+  FunctionTool: google.adk.tools.function_tool.FunctionTool
+  genai: google.generativeai
+  getpass: getpass
+  HarmBlockThreshold: langchain_google_genai.HarmBlockThreshold
+  HarmCategory: langchain_google_genai.HarmCategory
+  hashlib: hashlib
+  InMemoryArtifactService: google.adk.artifacts.in_memory_artifact_service.InMemoryArtifactService
+  InMemorySessionService: google.adk.sessions.InMemorySessionService
+  json: json
+  judge_agent: agents.judge_agent
+  List: typing.List
+  LlmAgent: google.adk.agents.LlmAgent
+  load_dotenv: dotenv.load_dotenv
+  logger: loguru.logger
+  logging: logging
+  mask_agent: agents.mask_agent
+  mask_sensitive_data: clients.query_MCP_ADK_A2A.mask_sensitive_data
+  mcp_query_data: servers.server_mcp.query_data
+  MCPToolset: google.adk.tools.mcp_tool.mcp_toolset.MCPToolset
+  os: os
+  parse: urllib.parse
+  pd: pandas
+  PROJECT_ID: clients.query_MCP_ADK_A2A.PROJECT_ID
+  query_data: servers.server_mcp.query_data
+  re: re
+  Request: google.auth.transport.requests.Request
+  requests: requests
+  run_mcp_agent: agents.mcp_agent.run_mcp_agent
+  Runner: google.adk.runners.Runner
+  secretmanager: google.cloud.secretmanager
+  SequentialAgent: google.adk.agents.SequentialAgent
+  sql_agent: agents.sql_agent
+  SQLDatabase: langchain_community.utilities.SQLDatabase
+  SQLDatabaseToolkit: langchain_community.agent_toolkits.SQLDatabaseToolkit
+  sqlite3: sqlite3
+  StdioServerParameters: google.adk.tools.mcp_tool.mcp_toolset.StdioServerParameters
+  sys: sys
+  threading: threading
+  tool: langchain.tools.tool
+  toolkit: servers.server_mcp.toolkit
+  types: google.genai.types
+  Union: typing.Union
+  uuid: uuid
+  uvicorn: uvicorn
+
+functions:
+  __init__:
+    type: sync
+    module: evaluation.simple_evaluator
+    args: [self, scenarios_file, config_file]
+  _call_a2a_agent_stream:
+    type: async
+    module: clients.a2a_client
+    args: [query, url, task_id, session_id]
+  _call_a2a_agent_sync:
+    type: async
+    module: clients.a2a_client
+    args: [query, url, task_id, session_id]
+  _hash_password:
+    type: sync
+    module: servers.server_mcp
+    args: [self, password]
+    params:
+      returns: str
+  _preprocess_query:
+    type: sync
+    module: clients.query_MCP_ADK_A2A
+    args: [self, query]
+    params:
+      returns: str
+  analyze_salary_data_async:
+    type: async
+    module: clients.query_MCP_ADK_A2A
+    args: [query]
+  call_a2a_agent:
+    type: async
+    module: clients.a2a_client
+    args: [query, host, port, stream]
+  call_judge_agent:
+    type: async
+    module: clients.query_MCP_ADK_A2A
+    args: [query]
+  call_mask_agent:
+    type: async
+    module: clients.query_MCP_ADK_A2A
+    args: [text]
+  call_sql_agent:
+    type: async
+    module: clients.query_MCP_ADK_A2A
+    args: [query]
+  create_runner:
+    type: sync
+    module: main
+    args: [agent, app_name]
+  evaluate_prompt:
+    type: sync
+    module: clients.query_MCP_ADK_A2A
+    args: [query]
+    params:
+      returns: str
+  evaluate_query:
+    type: async
+    module: evaluation.simple_evaluator
+    args: [self, query, expected_outcome, test_name]
+    params:
+      returns: Dict
+  evaluator:
+    type: sync
+    module: agents.agent
+    args: [text]
+    params:
+      returns: dict
+  execute_sql_query:
+    type: tool
+    module: servers.server_mcp
+    args: [sql]
+    params:
+      returns: str
+  get_access_token:
+    type: sync
+    module: clients.query_MCP_ADK_A2A
+  get_agent_async:
+    type: async
+    module: agents.mcp_agent
+  get_secret:
+    type: sync
+    module: clients.query_MCP_ADK_A2A
+    args: [project_id, secret_id, version_id]
+    params:
+      returns: str
+  get_table_info:
+    type: tool
+    module: servers.server_mcp
+    args: [tables]
+    params:
+      returns: str
+  get_tools_async:
+    type: async
+    module: agents.mcp_agent
+  list_database_tables:
+    type: tool
+    module: servers.server_mcp
+    params:
+      returns: str
+  main:
+    type: async
+    module: evaluation.simple_evaluator
+  mask_sensitive_data:
+    type: sync
+    module: clients.query_MCP_ADK_A2A
+    args: [project_id, text]
+  mask_text:
+    type: sync
+    module: agents.agent
+    args: [text]
+    params:
+      returns: dict
+  query_data:
+    type: sync
+    module: agents.agent
+    args: [sql]
+    params:
+      returns: str
+  run_evaluation:
+    type: async
+    module: evaluation.simple_evaluator
+    args: [self]
+  run_mcp_agent:
+    type: async
+    module: agents.mcp_agent
+    args: [query]
+  run_server:
+    type: sync
+    module: servers.run_servers
+    args: [server]
+  sanitize_input:
+    type: sync
+    module: clients.query_MCP_ADK_A2A
+    args: [text]
+    params:
+      returns: str
+  setup_database:
+    type: sync
+    module: servers.server_mcp
+    args: [authenticator]
+    params:
+      returns: SQLDatabase
+  verify_credentials:
+    type: sync
+    module: servers.server_mcp
+    args: [self, username, password]
+    params:
+      returns: bool
+
+variables:
+  GOOGLE_API_KEY:
+    type: env
+    params:
+      caller: [os.environ]
+  password:
+    type: env
+    params:
+      caller: [setup_database]
+
+files:
+  "..":
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [os.path.dirname(), ".."]
+  config_file:
+    type: variable
+    actions: [read]
+    params:
+      caller: [open, json.load]
+      alias: [f]
+  scenarios_file:
+    type: variable
+    actions: [read]
+    params:
+      caller: [open, json.load]
+      alias: [f]
+
+processes:
+  python:
+    type: mcp
+    actions: [exec]
+    args: [[./servers/server_mcp.py]]
+    params:
+      caller: [StdioServerParameters]
+      shell: ["False"]
+
+networks:
+  modelarmor.:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      caller: [sanitize_input]
+  url:
+    type: api
+    actions: [GET]
+    protocols: [http]
+    ports: ["80"]
+    params:
+      pattern: http://{host}:{port}/rpc
+      caller: [call_a2a_agent]
+      dynamic: "True"
+      variable: url
