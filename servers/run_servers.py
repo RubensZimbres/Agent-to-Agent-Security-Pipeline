@@ -3,13 +3,9 @@ import asyncio
 import logging
 import threading
 import uvicorn
-# In run_servers.py
 
 import os
 import sys
-import threading
-import uvicorn
-import logging
 
 # Add the project root to the path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -26,8 +22,6 @@ from servers.a2a_servers import create_judge_server, create_mask_server, create_
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Rest of the file can remain the same
-# Import your existing agent functionality
 USER_ID = "user_1"
 
 def run_server(server):

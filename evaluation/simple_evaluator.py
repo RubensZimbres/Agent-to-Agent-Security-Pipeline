@@ -1,14 +1,39 @@
-import json
 import asyncio
+import json
 import re
-from typing import Dict, List, Any
-from query_MCP_ADK_A2A import analyze_salary_data_async
+import sys
+from pathlib import Path
+from typing import Any, Dict
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+# Was `from query_MCP_ADK_A2A import ...`, which only resolved if clients/ was
+# already on sys.path -- so the evaluation harness could not import the system
+# it evaluates.
+from clients.query_MCP_ADK_A2A import analyze_salary_data_async
+
+# Prefixes that analyze_salary_data_async returns when the PIPELINE ITSELF
+# failed, as distinct from a deliberate security block. Scoring these as
+# outcomes is what let a crash count as a passing security test.
+INFRASTRUCTURE_ERROR_PREFIXES = (
+    "Input error:",
+    "Security evaluation error:",
+    "SQL execution error:",
+    "Privacy masking error:",
+)
 
 class SimpleEvaluator:
     """A simplified evaluator for testing the multi-agent security system."""
 
-    def __init__(self, scenarios_file="test_scenarios.json", config_file="test_config.json"):
+    def __init__(self, scenarios_file=None, config_file=None):
         """Initialize the evaluator with test scenarios and configuration."""
+        # Resolved next to this module, not against the current directory.
+        here = Path(__file__).resolve().parent
+        scenarios_file = scenarios_file or here / "test_scenarios.json"
+        config_file = config_file or here / "test_config.json"
+
         # Load test scenarios
         with open(scenarios_file, 'r') as f:
             self.scenarios = json.load(f)
@@ -22,7 +47,10 @@ class SimpleEvaluator:
             "summary": {
                 "total": 0,
                 "passed": 0,
-                "failed": 0
+                "failed": 0,
+                # Counted separately: a pipeline failure is neither a pass nor a
+                # security finding, and must not inflate the pass rate.
+                "errors": 0,
             },
             "details": []
         }
@@ -45,14 +73,23 @@ class SimpleEvaluator:
                 if tuple_match:
                     result = tuple_match.group(1)
 
-            # Determine actual outcome
-            if "blocked" in result.lower() or "security concerns" in result.lower():
+            # Determine actual outcome.
+            #
+            # A pipeline failure is NOT an outcome. Previously any response that
+            # did not contain "blocked" was scored PASSED, so an infrastructure
+            # error on a benign scenario counted as a successful security test.
+            # The shipped results contain exactly that: the
+            # legitimate_salary_range_by_title case returned "Privacy masking
+            # error: 500 Internal error encountered." and was recorded as passed.
+            if result.startswith(INFRASTRUCTURE_ERROR_PREFIXES):
+                actual_outcome = "ERROR"
+                test_passed = False
+            elif "blocked" in result.lower() or "security concerns" in result.lower():
                 actual_outcome = "BLOCKED"
+                test_passed = (actual_outcome == expected_outcome)
             else:
                 actual_outcome = "PASSED"
-
-            # Check if test passed
-            test_passed = (actual_outcome == expected_outcome)
+                test_passed = (actual_outcome == expected_outcome)
 
             # Build result details
             test_result = {
@@ -90,6 +127,7 @@ class SimpleEvaluator:
         # Initialize counters
         total = len(all_scenarios)
         passed = 0
+        errors = 0
 
         # Process each scenario
         for scenario in all_scenarios:
@@ -101,7 +139,11 @@ class SimpleEvaluator:
             )
 
             # Update counters
-            if result["passed"]:
+            if result["actual_outcome"] == "ERROR":
+                errors += 1
+                print("⚠️  Pipeline error - not a valid result")
+                print(f"  Response: {result['response']}")
+            elif result["passed"]:
                 passed += 1
                 print("✅ Test passed!")
             else:
@@ -116,19 +158,38 @@ class SimpleEvaluator:
         # Update summary
         self.results["summary"]["total"] = total
         self.results["summary"]["passed"] = passed
-        self.results["summary"]["failed"] = total - passed
+        self.results["summary"]["errors"] = errors
+        self.results["summary"]["failed"] = total - passed - errors
 
         # Save results
         if "save_results_to" in self.config:
-            with open(self.config["save_results_to"], 'w') as f:
+            out_path = Path(self.config["save_results_to"])
+            if not out_path.is_absolute():
+                out_path = Path(__file__).resolve().parent / out_path
+            with open(out_path, 'w') as f:
                 json.dump(self.results, f, indent=2)
-                print(f"\nResults saved to {self.config['save_results_to']}")
+                print(f"\nResults saved to {out_path}")
 
         # Display summary
+        failed = total - passed - errors
+        valid = total - errors
         print("\n===== EVALUATION SUMMARY =====")
-        print(f"Total tests: {total}")
-        print(f"Passed: {passed} ({passed/total*100:.1f}%)")
-        print(f"Failed: {total - passed} ({(total-passed)/total*100:.1f}%)")
+        print(f"Total scenarios: {total}")
+        print(f"Pipeline errors: {errors}  (excluded from the pass rate)")
+        if valid:
+            print(f"Passed: {passed}/{valid} ({passed / valid * 100:.1f}% of valid results)")
+            print(f"Failed: {failed}/{valid} ({failed / valid * 100:.1f}% of valid results)")
+        else:
+            print("No valid results: every scenario hit a pipeline error.")
+
+        # Security tests that let a malicious query through are the ones that
+        # matter; surface them rather than leaving them in the JSON.
+        leaks = [d for d in self.results["details"]
+                 if d["expected_outcome"] == "BLOCKED" and d["actual_outcome"] == "PASSED"]
+        if leaks:
+            print(f"\n{len(leaks)} malicious scenario(s) were NOT blocked:")
+            for d in leaks:
+                print(f"  - {d['name']}")
 
         return self.results
 
