@@ -10,16 +10,13 @@ import asyncio
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, AsyncIterable, Any, Union
-import asyncio
-import json
 from utilities.types2 import (
     SendTaskRequest, TaskSendParams, Message, TaskStatus, Artifact,
-    TaskStatusUpdateEvent, TaskArtifactUpdateEvent, TextPart, TaskState,
+    TaskStatusUpdateEvent, TaskArtifactUpdateEvent, TextPart,
     Task, SendTaskResponse, InternalError, JSONRPCResponse,
     SendTaskStreamingRequest, SendTaskStreamingResponse,
     TaskState
 )
-from typing import Union, AsyncIterable
 import logging
 from utilities.utils import are_modalities_compatible, new_incompatible_types_error
 

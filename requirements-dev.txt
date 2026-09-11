@@ -1,0 +1,7 @@
+# Test-only dependencies, kept out of requirements.txt.
+-r requirements.txt
+
+pytest>=8.0
+# Required by `asyncio_mode = auto` in pytest.ini; without it the async tests
+# are reported as failures rather than as a missing dependency.
+pytest-asyncio>=0.24

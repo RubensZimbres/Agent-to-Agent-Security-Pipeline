@@ -1,49 +1,55 @@
-from agents import judge_agent, mask_agent, sql_agent
+"""Entry point for running the pipeline through the ADK CLI.
+
+`create_runner` is kept as a helper for programmatic use. It is now async: ADK's
+`session_service.create_session` is a coroutine, and the previous synchronous
+version never awaited it -- the call returned an un-awaited coroutine and the
+session was never created. main() also built a runner and then discarded it
+before handing control to the CLI, so none of that work had any effect.
+"""
+import os
+
+from dotenv import load_dotenv
+from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
-import asyncio
-import os
-from dotenv import load_dotenv
+
+from agents import judge_agent, mask_agent, sql_agent, root_agent  # noqa: F401
 
 # Load environment variables
 load_dotenv()
 
-# Define constants
-USER_ID = "user_1"
+USER_ID = os.getenv("ADK_USER_ID", "user_1")
 
-def create_runner(agent, app_name):
-    """Create a runner for an agent."""
+
+async def create_runner(agent, app_name, session_id=None):
+    """Create a Runner with a live session. Returns (runner, session_id)."""
     session_service = InMemorySessionService()
     artifact_service = InMemoryArtifactService()
 
-    # Create a session for the agent
-    session_id = f"{app_name}_{agent.name}"
-    session_service.create_session(
+    session_id = session_id or f"{app_name}_{agent.name}"
+    await session_service.create_session(
         app_name=app_name,
         user_id=USER_ID,
-        session_id=session_id
+        session_id=session_id,
     )
 
-    # Create and return the runner
-    return Runner(
+    runner = Runner(
         agent=agent,
         app_name=app_name,
         artifact_service=artifact_service,
         session_service=session_service,
-    ), session_id
+    )
+    return runner, session_id
 
-# You can choose which agent to run based on command line args or environment variables
+
 def main():
-    # For example, run the SQL agent
-    runner, session_id = create_runner(sql_agent, "sql_analysis_app")
+    """Hand control to the ADK CLI.
 
-    # You could set up CLI argument parsing here to choose which agent to run
-    # For now, we'll just run the SQL agent as an example
-
-    # Import and use the ADK CLI to run the agent
+    Run the full pipeline with:  adk run agents
+    """
     from google.adk.cli import app
     app.run()
+
 
 if __name__ == "__main__":
     main()

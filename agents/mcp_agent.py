@@ -1,24 +1,16 @@
-# More complete implementation of mcp_agent.py
-import asyncio
 import logging
 import uuid
-from dotenv import load_dotenv
 from google.genai import types
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
-import os
-import sys
 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Load environment variables if needed
-# load_dotenv()
 
 async def get_tools_async():
     """Gets tools from the MCP Server."""
@@ -28,9 +20,9 @@ async def get_tools_async():
         # Connect to your existing MCP server
         tools, exit_stack = await MCPToolset.from_server(
             connection_params=StdioServerParameters(
-                command='python',  # Command to run the server
+                command='python',
                 args=[
-                    "./servers/server_mcp.py"  # Your existing MCP server
+                    "./servers/server_mcp.py"
                 ],
             )
         )
@@ -48,7 +40,7 @@ async def get_agent_async():
 
         # Create the agent with MCP tools
         root_agent = LlmAgent(
-            model='gemini-2.5-pro-preview-03-25',  # Match your model from query_MCP_ADK_A2A.py
+            model='gemini-3.7-flash',
             name='sql_analysis_assistant',
             instruction="""
             You are an expert SQL analyst working with a salary database.
@@ -58,7 +50,7 @@ async def get_agent_async():
             3. Format results in a clear, readable way
             4. Be particularly careful with sensitive information in the results
             """,
-            tools=tools,  # Provide the MCP tools to the ADK agent
+            tools=tools,
         )
 
         return root_agent, exit_stack
@@ -78,7 +70,7 @@ async def run_mcp_agent(query):
         session = session_service.create_session(
             state={},
             app_name='mcp_sql_analysis_app',
-            user_id='user_1',  # Using your existing USER_ID
+            user_id='user_1',
             session_id=session_id
         )
 
@@ -116,7 +108,6 @@ async def run_mcp_agent(query):
         logger.error(f"Error running MCP agent: {e}")
         return f"Error: {str(e)}"
     finally:
-        # Clean up MCP connection
         if exit_stack:
             logger.info("Closing MCP server connection...")
             try:

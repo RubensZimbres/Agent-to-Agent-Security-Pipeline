@@ -1,1 +1,15 @@
 **/__pycache__/
+*.py[cod]
+.pytest_cache/
+venv/
+.venv/
+
+# Secrets. agents/.env was committed with the project; .env was never ignored,
+# so a filled-in copy would have been committed too.
+.env
+**/.env
+!.env.example
+
+# NOTE: evaluation/security_test_results.json is deliberately NOT ignored. It is
+# tracked upstream and tests/test_evaluator_scoring.py reads it as the recorded
+# evidence that a pipeline failure was once scored as a passing security test.

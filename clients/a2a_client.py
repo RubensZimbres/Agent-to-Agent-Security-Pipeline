@@ -1,9 +1,7 @@
 # a2a_client.py
 import uuid
-import requests
 import json
 import aiohttp
-import asyncio
 import logging
 
 logger = logging.getLogger(__name__)

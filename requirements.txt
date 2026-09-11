@@ -1,6 +1,9 @@
 fastapi>=0.95.0
+# google-adk 0.1.0 is the initial release; the APIs used here (LlmAgent,
+# SequentialAgent, MCPToolset, FunctionTool) have moved since. Pinning the
+# major line rather than the first-ever release.
+google-adk>=1.0,<2.0
 google-generativeai==0.8.4
-google-adk==0.1.0
 google-auth==2.38.0
 google-cloud-dlp==3.28.0
 google-cloud-secret-manager==2.23.2
@@ -10,3 +13,8 @@ langchain-google-genai==2.0.10
 langchain-community==0.3.18
 mcp==1.6.0
 loguru
+python-dotenv
+requests>=2.32
+# Imported by clients/a2a_client.py for the async A2A calls, but was not
+# declared -- a fresh install failed on the first client import.
+aiohttp>=3.9
